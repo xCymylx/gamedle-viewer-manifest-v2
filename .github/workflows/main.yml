@@ -1,5 +1,6 @@
-name: Create Archive
+name: Create Release
 on: [push]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -11,3 +12,13 @@ jobs:
         type: 'zip'
         filename: 'release.zip'
         exclusions: '*.git*'
+    - name: Copy Archive To XPI
+      uses: canastro/copy-file-action@master
+      with:
+        source: "release.zip"
+        target: "release.xpi"
+    - name: Upload Release
+      uses: ncipollo/release-action@v1.12.0
+      with:
+        artifacts: "release.zip,release.xpi"
+        token: ${{ secrets.TOKEN }}
