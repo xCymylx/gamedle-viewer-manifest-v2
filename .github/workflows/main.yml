@@ -4,21 +4,37 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - name: Archive Release
-      uses: thedoctor0/zip-release@0.7.6
-      with:
-        type: 'zip'
-        filename: 'release.zip'
-        exclusions: '*.git*'
-    - name: Copy Archive To XPI
-      uses: canastro/copy-file-action@master
-      with:
-        source: "release.zip"
-        target: "release.xpi"
-    - name: Upload Release
-      uses: ncipollo/release-action@v1.12.0
-      with:
-        artifacts: "release.zip,release.xpi"
-        token: ${{ secrets.TOKEN }}
+    steps:      
+      - name: Checkout
+        uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+      - name: Fetch tags
+        shell: bash
+        run: git fetch --tags -f
+      - name: Autotag
+        uses: DanySK/semver-autotag-action@master
+      - name: Deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        run: |
+          TAG=$(git describe --tags --exact-match HEAD)
+          hub release create -m "$(git tag -l --format='%(contents)' "$TAG")" "$TAG" || true
+          hub release edit -m '' -a a_file "$TAG"
+      - name: Archive Release
+        uses: thedoctor0/zip-release@0.7.6
+        with:
+          type: 'zip'
+          filename: 'release.zip'
+          exclusions: '*.git*'
+      - name: Copy Archive To XPI
+        uses: canastro/copy-file-action@master
+        with:
+          source: "release.zip"
+          target: "release.xpi"
+      - name: Upload Release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          artifacts: "release.zip,release.xpi"
+          tag: ""
+          token: ${{ secrets.TOKEN }}
