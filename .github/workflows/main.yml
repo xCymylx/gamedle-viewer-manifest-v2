@@ -1,0 +1,64 @@
+name: Auto Tag and Release
+
+on:
+  push:
+    branches:
+      - main  # Change this to your default branch if different
+
+permissions:
+  contents: write  # Needed to create releases and push tags
+
+jobs:
+  tag-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true  # This preserves the authentication for git commands
+
+      - name: Get next SemVer tag
+        id: get_tag
+        run: |
+          # Get the latest tag that matches SemVer pattern
+          LATEST_TAG=$(git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || echo "v0.0.0")
+          
+          # Split into parts
+          IFS='.' read -r -a tag_parts <<< "${LATEST_TAG#v}"
+          MAJOR=${tag_parts[0]}
+          MINOR=${tag_parts[1]}
+          PATCH=${tag_parts[2]}
+          
+          # Increment patch version
+          NEW_PATCH=$((PATCH + 1))
+          NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+          
+          echo "New tag: $NEW_TAG"
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Create new tag
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git tag ${{ steps.get_tag.outputs.NEW_TAG }}
+          git push origin ${{ steps.get_tag.outputs.NEW_TAG }}
+
+      - name: Create zip files
+        run: |
+          # Create release.zip
+          zip -r release.zip . -x '.git/*' -x '.github/*'
+          
+          # Copy to release.xpi
+          cp release.zip release.xpi
+          
+          echo "Created release.zip and release.xpi"
+
+      - name: Create release with assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_tag.outputs.NEW_TAG }}
+          name: Release ${{ steps.get_tag.outputs.NEW_TAG }}
+          files: |
+            release.zip
+            release.xpi
